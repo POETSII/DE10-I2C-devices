@@ -104,7 +104,7 @@ module mkPowerReader (PowerReaderIfc);
 
     Reg#(Bit#(32)) cnt <- mkReg(50000000);
 
-    Power power12 <- mkPower(7'b1101100); //DE10 12v Power IC addr 0x6C
+    Power power12 <- mkPower(7'b1101010); //DE10 12v Power IC addr 0xD4/D5
 
     PulseWire pw <- mkPulseWire;
 
