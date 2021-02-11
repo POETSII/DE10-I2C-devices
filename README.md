@@ -9,9 +9,8 @@ Temperature sensor, exposes two interfaces:
 interface Temp;
     interface I2C_Pins i2c;
 
-    method Stmt init();
-    
-    method Stmt read_val(Reg#(Bit#(8)) result);
+    method Action start_read();
+    method Bit#(8) get_temp();
 endinterface
 
 module mkTemp #(parameter Bit#(7) slave_addr) (Temp);
