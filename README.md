@@ -6,14 +6,23 @@ Various modules for accessing the I2C devices on the DE10-Pro board.
 Temperature sensor, exposes two interfaces:
 
 ```bluespec
+typedef union tagged {
+    void ReadTemp;
+} TempReq
+  deriving (Bits);
+
+typedef union tagged {
+    Bit#(8) TempVal;
+} TempRsp
+  deriving (Bits);
+
 interface Temp;
     interface I2C_Pins i2c;
-
-    method Action start_read();
-    method Bit#(8) get_temp();
+    
+    interface Server#(TempReq, TempRsp) data;
 endinterface
 
-module mkTemp #(parameter Bit#(7) slave_addr) (Temp);
+module mkTemp #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (Temp);
 ```
 Allows on demand polling of a sensor IC to read an 8bit temperature value.
 
@@ -27,9 +36,12 @@ interface TempReaderIfc;
     method Bit#(8) get_temp ();
 endinterface
 
-module mkTempReader (TempReaderIfc);
+module mkTempReader #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (TempReaderIfc);
+module mkDE10TempReader (TempReaderIfc);
 ```
-A bundled reader that automatically initialises and then constantly refreshes an internal stored value accessible via the get\_temp method. When given a 50MHz clock the reader will refresh the value once per second.
+A bundled reader that automatically initialises and then constantly refreshes an internal stored value accessible via the get\_temp method. Refreshes the value once per second.
+
+mkDE10TempReader auto sets the slave\_addr to the appropriate value for the DE10 and clk\_freq to 50MHz.
 
 
 ## Power.bsv
