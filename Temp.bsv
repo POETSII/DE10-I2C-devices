@@ -5,6 +5,7 @@ import I2CUtil::*;
 import StmtFSM::*;
 import GetPut::*;
 import ClientServer::*;
+import FIFO::*;
 
 typedef union tagged {
     void ReadTemp;
@@ -47,20 +48,19 @@ module mkTemp #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (Temp)
     let i2c_prescale = clk_freq / 400000;
     I2C temp <- mkI2C(i2c_prescale);
 
-    Wire#(TempReq) dataIn <- mkWire();
+    FIFO#(TempReq) dataIn <- mkFIFO1();
     Wire#(TempRsp) dataOut <- mkWire();
-    Reg#(TempReq) cur_req <- mkReg(?);
 
     Stmt fsm =
     seq
         temp_init(temp, slave_addr);
         while(True) seq
-            cur_req <= dataIn;
             par
-                if( isReadTemp(cur_req) ) seq
+                if( isReadTemp(dataIn.first) ) seq
                     temp_read_val(temp, slave_addr, dataOut);
                 endseq
             endpar
+            dataIn.deq();
         endseq
     endseq;
 
@@ -73,11 +73,7 @@ module mkTemp #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (Temp)
     interface I2C_Pins i2c = temp.i2c;
 
     interface Server data;
-        interface Put request;
-            method Action put(TempReq v);
-                dataIn <= v;
-            endmethod
-        endinterface
+        interface Put request = toPut(dataIn);
 
         interface Get response;
             method ActionValue#(TempRsp) get;
