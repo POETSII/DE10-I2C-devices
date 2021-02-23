@@ -12,31 +12,12 @@ typedef union tagged {
 } TempReq
   deriving (Bits);
 
-function Bool isReadTemp(TempReq val);
-    if (val matches tagged ReadTemp)
-        return True;
-    else
-        return False;
-endfunction
+function Bool isReadTemp(TempReq val) = val matches tagged ReadTemp ? True : False;
 
 typedef union tagged {
     Bit#(8) TempVal;
 } TempRsp
   deriving (Bits);
-
-function Stmt temp_init(I2C temp, Bit#(7) slave_addr) = seq
-    i2c_write_byte(temp, slave_addr, 8'h0A, 8'b00010100);
-endseq;
-
-function Stmt temp_read_val(I2C temp, Bit#(7) slave_addr, Wire#(TempRsp) result);
-    seq
-        i2c_read_byte(temp, slave_addr, 8'h01);
-        action
-            let data <- i2c_get_byte(temp);
-            result <= tagged TempVal(data);
-        endaction
-    endseq;
-endfunction
 
 interface Temp;
     interface I2C_Pins i2c;
@@ -48,16 +29,30 @@ module mkTemp #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (Temp)
     let i2c_prescale = clk_freq / 400000;
     I2C temp <- mkI2C(i2c_prescale);
 
+
+    function Stmt dev_init() = seq
+        i2c_write_byte(temp, slave_addr, 8'h0A, 8'b00010100);
+    endseq;
+
+    function Stmt read_val(Wire#(TempRsp) result) = seq
+        i2c_read_byte(temp, slave_addr, 8'h01);
+        action
+            let data <- i2c_get_byte(temp);
+            result <= TempVal(data);
+        endaction
+    endseq; 
+    
+
     FIFO#(TempReq) dataIn <- mkFIFO1();
     Wire#(TempRsp) dataOut <- mkWire();
 
     Stmt fsm =
     seq
-        temp_init(temp, slave_addr);
+        dev_init();
         while(True) seq
             par
                 if( isReadTemp(dataIn.first) ) seq
-                    temp_read_val(temp, slave_addr, dataOut);
+                    read_val(dataOut);
                 endseq
             endpar
             dataIn.deq();
@@ -76,9 +71,9 @@ module mkTemp #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (Temp)
         interface Put request = toPut(dataIn);
 
         interface Get response;
-            method ActionValue#(TempRsp) get;
+            method get = actionvalue
                 return dataOut;
-            endmethod
+            endactionvalue;
         endinterface
     endinterface
 endmodule: mkTemp
@@ -105,7 +100,7 @@ module mkTempReader #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) 
 
     rule counter_rst (cnt == 0);
         cnt <= fromInteger(clk_freq);
-        temp.data.request.put(tagged ReadTemp);
+        temp.data.request.put(ReadTemp);
     endrule
 
     rule temp_update;
@@ -116,9 +111,7 @@ module mkTempReader #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) 
 
     interface I2C_Pins i2c = temp.i2c;
 
-    method Bit#(8) get_temp();
-        return cur_temp;
-    endmethod
+    method get_temp() = cur_temp;
 endmodule
 
 (* synthesize *)
