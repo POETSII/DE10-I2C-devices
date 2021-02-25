@@ -1,0 +1,3 @@
+[submodule "Recipe"]
+	path = Recipe
+	url = https://github.com/CTSRD-CHERI/Recipe.git
