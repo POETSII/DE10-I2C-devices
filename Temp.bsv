@@ -6,6 +6,11 @@ import StmtFSM::*;
 import GetPut::*;
 import ClientServer::*;
 import FIFO::*;
+import List::*;
+
+import ListExtra::*;
+import Recipe::*;
+#include "RecipeMacros.h"
 
 typedef union tagged {
     void ReadTemp;
@@ -30,39 +35,37 @@ module mkTemp #(parameter Bit#(7) slave_addr, parameter Integer clk_freq) (Temp)
     I2C temp <- mkI2C(i2c_prescale);
 
 
-    function Stmt dev_init() = seq
-        i2c_write_byte(temp, slave_addr, 8'h0A, 8'b00010100);
-    endseq;
+    function Recipe dev_init() = Seq
+        rAct(i2c_write_byte(temp, slave_addr, 8'h0A, 8'b00010100))
+    End;
 
-    function Stmt read_val(Wire#(TempRsp) result) = seq
-        i2c_read_byte(temp, slave_addr, 8'h01);
-        action
+    function Recipe read_val(Wire#(TempRsp) result) = Seq
+        rAct(i2c_read_byte(temp, slave_addr, 8'h01)),
+        rAct(action
             let data <- i2c_get_byte(temp);
             result <= TempVal(data);
-        endaction
-    endseq; 
+        endaction)
+    End; 
     
 
     FIFO#(TempReq) dataIn <- mkFIFO1();
     Wire#(TempRsp) dataOut <- mkWire();
 
-    Stmt fsm =
-    seq
-        dev_init();
-        while(True) seq
-            par
-                if( isReadTemp(dataIn.first) ) seq
-                    read_val(dataOut);
-                endseq
-            endpar
-            dataIn.deq();
-        endseq
-    endseq;
+    Recipe fsm = Seq
+        dev_init(),
+        While(True) Seq
+            rOneMatch(list( isReadTemp(dataIn.first) ),
+                      list( read_val(dataOut) ),
+                      rAct(noAction)),
+            rAct(dataIn.deq())
+        End
+        End
+    End;
 
-    FSM main <- mkFSM( fsm );
+    RecipeFSM main <- mkRecipeFSM( fsm );
 
     rule run_main;
-        main.start();
+        main.trigger();
     endrule
 
     interface I2C_Pins i2c = temp.i2c;
