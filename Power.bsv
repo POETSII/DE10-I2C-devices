@@ -206,9 +206,6 @@ module mkPowerReader #(parameter Bit#(7) slave_addr, parameter Integer clk_freq)
             endaction
             power12.data.request.put(ResetPowerMinMax);
             power12.data.request.put(SetTestMode(False));
-            action
-                let _ <- power12.data.response.get();
-            endaction
         endseq
     endseq;
 
